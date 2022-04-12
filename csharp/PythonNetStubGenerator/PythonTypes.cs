@@ -101,6 +101,7 @@ namespace PythonNetStubGenerator
             if (t == typeof(ushort)) return "int";
             if (t == typeof(ulong)) return "int";
             if (t == typeof(IntPtr)) return "int";
+            if (t == typeof(Type)) return "typing.Type[typing.Any]";
             if (t == typeof(Array))
             {
                 AddArrayDependency(false);
