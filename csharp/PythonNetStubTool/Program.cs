@@ -28,26 +28,22 @@ namespace PythonNetStubTool
             {
                 if (assemblyPath.Exists)
                 {
-                    Console.WriteLine($"building stubs for {assemblyPath}");
-                    try
-                    {
-                        var dest = StubBuilder.BuildAssemblyStubs(
-                            assemblyPath,
-                            destPath: destPath,
-                            searchPaths: searchPaths
-                        );
-                        Console.WriteLine($"stubs saved to {dest}");
-                    }
-                    catch (Exception sgEx)
-                    {
-                        Console.WriteLine($"error: failed generating stubs | {sgEx.Message}");
-                        throw;
-                    }
-                }
-                else
-                {
                     Console.WriteLine($"error: can not find {assemblyPath}");
                 }
+
+            }
+            
+            Console.WriteLine($"building stubs...");
+
+            try
+            {
+                var dest = StubBuilder.BuildAssemblyStubs(destPath, targetDlls, searchPaths);
+                Console.WriteLine($"stubs saved to {dest}");
+            }
+            catch (Exception sgEx)
+            {
+                Console.WriteLine($"error: failed generating stubs | {sgEx.Message}");
+                throw;
             }
         }
     }

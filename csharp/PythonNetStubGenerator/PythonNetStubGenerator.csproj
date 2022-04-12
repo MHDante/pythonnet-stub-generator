@@ -3,6 +3,31 @@
   <PropertyGroup>
     <TargetFramework>netstandard2.0</TargetFramework>
 	<LangVersion>8.0</LangVersion>
+	<GeneratePackageOnBuild>True</GeneratePackageOnBuild>
+	<PackageId>PythonNetStubGenerator</PackageId>
+	<Version>1.0.0</Version>
+	<Authors>MHDante</Authors>
+	<Company>Transitional Forms Inc</Company>
+	<Product>PythonNetStubGenerator</Product>
+	<Description>Creates PEP 561 Python Stubs for use with a dll and python.net</Description>
+	<Copyright>Copyright (c) 2019 Robert McNeel &amp; Associates, Copyright (c) 2022 Dante Camarena</Copyright>
+	<PackageProjectUrl>https://github.com/MHDante/pythonnet-stub-generator</PackageProjectUrl>
+	<PackageReadmeFile>README.md</PackageReadmeFile>
+	<RepositoryUrl>https://github.com/MHDante/pythonnet-stub-generator</RepositoryUrl>
+	<PackageTags>python.net</PackageTags>
+	<PackageReleaseNotes>Initial Release</PackageReleaseNotes>
+	<PackageLicenseExpression>MIT</PackageLicenseExpression>
   </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="..\..\README.md">
+      <Pack>True</Pack>
+      <PackagePath>\</PackagePath>
+    </None>
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Build.Utilities.Core" Version="17.1.0" />
+  </ItemGroup>
 
 </Project>

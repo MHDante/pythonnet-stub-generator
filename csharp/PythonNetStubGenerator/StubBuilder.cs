@@ -12,25 +12,29 @@ namespace PythonNetStubGenerator
         private static HashSet<DirectoryInfo> SearchPaths { get; } = new HashSet<DirectoryInfo>();
 
 
-        public static DirectoryInfo BuildAssemblyStubs(FileInfo targetAssemblyPath, DirectoryInfo destPath, DirectoryInfo[] searchPaths = null)
+        public static DirectoryInfo BuildAssemblyStubs(DirectoryInfo destPath, FileInfo[] targetAssemblyPaths, DirectoryInfo[] searchPaths = null)
         {
             // prepare resolver
             AppDomain.CurrentDomain.AssemblyResolve -= AssemblyResolve;
             AppDomain.CurrentDomain.AssemblyResolve += AssemblyResolve;
 
             // pick a dll and load
-            var assemblyToStub = Assembly.LoadFrom(targetAssemblyPath.FullName);
-            SearchPaths.Add(targetAssemblyPath.Directory);
-
-            if (searchPaths != null)
-                foreach (var path in SearchPaths)
-                    SearchPaths.Add(path);
-
-
-            foreach (var exportedType in assemblyToStub.GetExportedTypes())
+            foreach (var targetAssemblyPath in targetAssemblyPaths)
             {
-                PythonTypes.AddDependency(exportedType);
+                var assemblyToStub = Assembly.LoadFrom(targetAssemblyPath.FullName);
+                SearchPaths.Add(targetAssemblyPath.Directory);
+                
+                if (searchPaths != null)
+                    foreach (var path in SearchPaths)
+                        SearchPaths.Add(path);
+
+
+                foreach (var exportedType in assemblyToStub.GetExportedTypes())
+                {
+                    PythonTypes.AddDependency(exportedType);
+                }
             }
+
 
 
             while (true)
