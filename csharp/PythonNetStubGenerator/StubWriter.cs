@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
@@ -11,6 +12,7 @@ namespace PythonNetStubGenerator
         public static string GetStub(string nameSpace, IEnumerable<Type> stubTypes)
         {
             var typeGroups = stubTypes
+                .Where(it=>it.IsVisible) // Avoid internal classes
                 .Where(it => it.DeclaringType == null) // Avoid Nested classes, they're handled later
                 .GroupBy(it => it.NonGenericName())
                 .OrderBy(it => it.Key).ToList();
@@ -21,7 +23,6 @@ namespace PythonNetStubGenerator
 
             using (new SymbolScope(reservedSymbols, nameSpace))
             {
-                
                 foreach (var typeGroup in typeGroups)
                     WriteTypeGroup(sb, typeGroup.Key, typeGroup);
 
@@ -441,6 +442,16 @@ namespace PythonNetStubGenerator
                 }
             }
 
+            if (stubType == typeof(IEnumerable))
+            {
+                sb.Indent().AppendLine($"def __iter__(self) -> typing.Iterator[typing.Any]: ...");
+            }
+            else if (stubType == typeof(IEnumerable<>))
+            {
+                var elementType = stubType.GetGenericArguments()[0].ToPythonType();
+                sb.Indent().AppendLine($"def __iter__(self) -> typing.Iterator[{elementType}]: ...");
+            }
+
             return methodGroups.Length > 0;
         }
 
@@ -820,7 +831,6 @@ namespace PythonNetStubGenerator
             var pythonParams = parameters.Select(GetParameter);
             if (includeSelf) pythonParams = pythonParams.Prepend("self");
             return pythonParams.CommaJoin();
-
         }
 
         private static void WriteEnum(StringBuilder sb, Type stubType)

@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Reflection;
 
@@ -20,7 +21,7 @@ namespace PythonNetStubGenerator
         {
             var isNewAdd = AllExportedTypes.Add(t);
             if (isNewAdd) DirtyNamespaces.Add(t.Namespace);
-            CurrentTypes.Add(t);
+            if (t!= typeof(Nullable<>)) CurrentTypes.Add(t);
         }
 
         public static void AddArrayDependency(bool isGeneric)
@@ -122,7 +123,9 @@ namespace PythonNetStubGenerator
                 return GetGenericTypeParameterName(t);
             }
 
+
             var cleanName = t.CleanName();
+
 
             if (withGenericParams)
             {
@@ -130,6 +133,13 @@ namespace PythonNetStubGenerator
                 if (generics.Count > 0)
                 {
                     var pythonTypeArgs = generics.Select(it => it.ToPythonType()).CommaJoin();
+
+                    if (t.IsConstructedGenericType && t.GetGenericTypeDefinition() == typeof(Nullable<>))
+                    {
+                        cleanName = "typing.Optional";
+                    }
+
+
                     cleanName = $"{cleanName}[{pythonTypeArgs}]";
                 }
             }

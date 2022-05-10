@@ -24,7 +24,10 @@ namespace PythonNetStubGenerator
 
             try
             {
+                Log.LogMessage(MessageImportance.High, "Generating Stubs for " + destPath.FullName);
                 StubBuilder.BuildAssemblyStubs(destPath, sourceDlls, directoryPaths);
+                Log.LogMessage(MessageImportance.High, "Done");
+
             }
             catch (Exception e)
             {

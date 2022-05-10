@@ -3,15 +3,13 @@ using System.Reflection;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Text;
 
 namespace PythonNetStubGenerator
 {
     public static class StubBuilder
     {
         private static HashSet<DirectoryInfo> SearchPaths { get; } = new HashSet<DirectoryInfo>();
-
-
+        
         public static DirectoryInfo BuildAssemblyStubs(DirectoryInfo destPath, FileInfo[] targetAssemblyPaths, DirectoryInfo[] searchPaths = null)
         {
             // prepare resolver
@@ -31,6 +29,7 @@ namespace PythonNetStubGenerator
 
                 foreach (var exportedType in assemblyToStub.GetExportedTypes())
                 {
+                    if(!exportedType.IsVisible) continue;
                     PythonTypes.AddDependency(exportedType);
                 }
             }

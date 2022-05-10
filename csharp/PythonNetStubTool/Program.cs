@@ -13,7 +13,7 @@ namespace PythonNetStubTool
         /// <param name="destPath">Path to save the subs to.</param>
         /// <param name="searchPaths">Path to search for referenced assemblies</param>
         /// <param name="targetDlls">Target DLLs</param>
-        static void Main(
+        static int Main(
             DirectoryInfo destPath,
             DirectoryInfo[]? searchPaths = null,
             params FileInfo[] targetDlls)
@@ -24,11 +24,13 @@ namespace PythonNetStubTool
                     Console.WriteLine($"search path {searchPath}");
             }
 
+            
             foreach (var assemblyPath in targetDlls)
             {
-                if (assemblyPath.Exists)
+                if (!assemblyPath.Exists)
                 {
                     Console.WriteLine($"error: can not find {assemblyPath}");
+                    return -1;
                 }
 
             }
@@ -39,6 +41,7 @@ namespace PythonNetStubTool
             {
                 var dest = StubBuilder.BuildAssemblyStubs(destPath, targetDlls, searchPaths);
                 Console.WriteLine($"stubs saved to {dest}");
+                return 0;
             }
             catch (Exception sgEx)
             {
