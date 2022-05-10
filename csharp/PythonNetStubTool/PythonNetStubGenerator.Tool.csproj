@@ -16,7 +16,7 @@
     <RepositoryUrl>https://github.com/MHDante/pythonnet-stub-generator</RepositoryUrl>
     <PackageTags>python.net</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <Version>1.0.2</Version>
+    <Version>1.0.3</Version>
   </PropertyGroup>
 
   <ItemGroup>
