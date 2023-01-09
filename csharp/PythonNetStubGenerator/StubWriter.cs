@@ -11,8 +11,10 @@ namespace PythonNetStubGenerator
     {
         public static string GetStub(string nameSpace, IEnumerable<Type> stubTypes)
         {
-            var typeGroups = stubTypes
-                .Where(it=>it.IsVisible) // Avoid internal classes
+            var types = stubTypes as Type[] ?? stubTypes.ToArray();
+            PythonTypes.CacheOverloadedNonGenericTypes(types);
+            var typeGroups = types
+                .Where(it => it.IsVisible) // Avoid internal classes
                 .Where(it => it.DeclaringType == null) // Avoid Nested classes, they're handled later
                 .GroupBy(it => it.NonGenericName())
                 .OrderBy(it => it.Key).ToList();
@@ -107,6 +109,7 @@ namespace PythonNetStubGenerator
         public static ClassScope WriteClassHeader(
             StringBuilder sb,
             string className,
+            bool shouldShadowGenerics,
             IEnumerable<Type> newGenerics = null,
             IEnumerable<string> classArguments = null,
             Dictionary<Type, string> genericAliases = null)
@@ -116,7 +119,7 @@ namespace PythonNetStubGenerator
 
             var outerAccessor = ClassScope.ScopeAccessor;
 
-            var classScope = new ClassScope(className, newGenerics);
+            var classScope = new ClassScope(className, newGenerics, shouldShadowGenerics);
             var generics = ClassScope.AccessibleGenerics.ToList();
 
             var writtenAliases = new HashSet<string>();
@@ -184,12 +187,12 @@ namespace PythonNetStubGenerator
 
 
             var externalGenerics = ClassScope.AccessibleGenerics.ToList();
-            using var _ = WriteClassHeader(sb, overloadClassName, classArguments: new[] { "abc.ABCMeta" });
+            using var _ = WriteClassHeader(sb, overloadClassName, false, classArguments: new[] { "abc.ABCMeta" });
 
 
             foreach (var type in types)
             {
-                var args = type.GetGenericArguments();
+                var args = type.GetGenericArguments().Skip(externalGenerics.Count).ToArray();
 
                 var targetType = type.ToPythonType(false);
 
@@ -201,12 +204,19 @@ namespace PythonNetStubGenerator
                 var typeArgsList = typeVarList.Select(typeVar => $"typing.Type[{typeVar}]");
                 var typeArgString = typeArgsList.CommaJoin();
 
+                if (args.Length == 0)
+                {
+                    sb.Indent().AppendLine($"def __call__(self) -> {targetType}[{typeVarString}]: ...");
+                    continue;
+                }
+
                 if (args.Length > 1) typeArgString = $"typing.Tuple[{typeArgString}]";
 
                 foreach (var arg in args)
                 {
-                    WriteTypeVariable(sb, arg, $"{prefix}{arg.ToPythonType()}", writeVariance:false);
+                    WriteTypeVariable(sb, arg, $"{prefix}{arg.ToPythonType()}", writeVariance: false);
                 }
+
 
                 if (types.Count > 1) sb.Indent().AppendLine("@typing.overload");
                 sb.Indent().AppendLine($"def __getitem__(self, types : {typeArgString}) -> typing.Type[{targetType}[{typeVarString}]]: ...");
@@ -240,7 +250,7 @@ namespace PythonNetStubGenerator
 
             var args = GetClassArguments(type);
 
-            using (WriteClassHeader(sb, className, typeArguments, args.ToArray()))
+            using (WriteClassHeader(sb, className, typeArguments.Any(), typeArguments, args.ToArray()))
             {
                 var wroteMember = false;
 
@@ -309,7 +319,7 @@ namespace PythonNetStubGenerator
             foreach (var group in depsByNamespace)
             {
                 if (group.Key == nameSpace) continue;
-                var types = group.Select(it => it.ToPythonType(false)).Distinct().ToList();
+                var types = group.Select(it => it.GetRootType().ToPythonType(false)).Distinct().ToList();
 
                 var arrayType = typeof(Array);
                 var arrayTypeStr = arrayType.ToPythonType(false);
@@ -330,6 +340,12 @@ namespace PythonNetStubGenerator
         }
 
 
+        private static Type GetRootType(this Type type)
+        {
+            if (type.DeclaringType == null) return type;
+            return GetRootType(type.DeclaringType);
+        }
+
         private static List<string> GetClassArguments(Type type)
         {
             var args = new List<string>();
@@ -338,9 +354,11 @@ namespace PythonNetStubGenerator
 
             if (type.IsInterface)
             {
-                foreach (var i in type.GetInterfaces())
+                foreach (var i in type.GetInterfaces().OrderBy(GetInterfaceDepth).Reverse())
                 {
-                    args.Add(i.ToPythonType());
+                    var baseName = i.ToPythonType();
+                    if (i.IsOverloadedNonGenericType()) baseName += "_0";
+                    args.Add(baseName);
                 }
                 args.Add("typing.Protocol");
             }
@@ -350,16 +368,23 @@ namespace PythonNetStubGenerator
             if (baseType != null && baseType != typeof(object) && baseType != typeof(ValueType))
             {
                 var baseName = baseType.ToPythonType();
-                if (type.IsGenericTypeDefinition)
-                {
-                    var nonGenericName = type.NonGenericName();
-                    if (baseName == nonGenericName) baseName += "_0";
-                }
-
+                if (baseType.IsOverloadedNonGenericType()) baseName += "_0";
                 args.Add(baseName);
             }
 
             return args;
+        }
+
+        private static readonly Dictionary<Type, int> InterfaceDepthCache = new Dictionary<Type, int>();
+        private static int GetInterfaceDepth(Type t)
+        {
+            if (InterfaceDepthCache.TryGetValue(t, out var val)) return val;
+            var interfaces = t.GetInterfaces();
+            if (interfaces.Length == 0) return 0;
+            var max = interfaces.Max(GetInterfaceDepth);
+            var depth = max + 1;
+            InterfaceDepthCache[t] = depth;
+            return depth;
         }
 
         private static void WriteTypeVariable(StringBuilder sb, Type typeVariable, string customName = null, bool writeVariance = true)
@@ -429,16 +454,18 @@ namespace PythonNetStubGenerator
                 .OrderBy(infos => IsMethodGroup(infos.ToList()))
                 .ToArray();
 
+            bool didWrite = false;
             foreach (var methodGroup in methodGroups)
             {
                 if (IsMethodGroup(methodGroup.ToList()))
                 {
                     WriteMethodGroup(sb, stubType, methodGroup, methodGroup.Key);
+                    didWrite = true;
                 }
                 else
                 {
                     foreach (var method in methodGroup)
-                        WriteSimpleMethod(sb, method, methodGroup.Count() > 1);
+                        didWrite |= WriteSimpleMethod(sb, method, methodGroup.Count() > 1);
                 }
             }
 
@@ -452,7 +479,7 @@ namespace PythonNetStubGenerator
                 sb.Indent().AppendLine($"def __iter__(self) -> typing.Iterator[{elementType}]: ...");
             }
 
-            return methodGroups.Length > 0;
+            return didWrite;
         }
 
         private static bool IsOperator(MethodBase method) => method.IsSpecialName && method.Name.StartsWith("op_");
@@ -467,7 +494,7 @@ namespace PythonNetStubGenerator
 
 
             var existingSignatures = new HashSet<string>();
-
+            List<ConstructorInfo> ConstructorsToAdd = new List<ConstructorInfo>();
             foreach (var constructor in constructors)
             {
 
@@ -477,15 +504,20 @@ namespace PythonNetStubGenerator
                 {
                     var dotnetParams = constructor.GetParameters().Select(it => $"{it.Name} : {it.ParameterType.Name}");
                     var dotnetSignature = dotnetParams.CommaJoin();
-                    sb.Indent().AppendLine($"# Method {constructor.Name}({dotnetSignature}) was skipped since it collides with above method");
+                    sb.Indent().AppendLine($"# Constructor {constructor.Name}({dotnetSignature}) was skipped since it collides with above method");
                     continue;
                 }
                 existingSignatures.Add(signature);
 
-                WriteSimpleMethod(sb, constructor, constructors.Length > 1);
+                ConstructorsToAdd.Add(constructor);
             }
 
-            return constructors.Length > 0;
+            foreach (var constructorInfo in ConstructorsToAdd)
+            {
+                WriteSimpleMethod(sb, constructorInfo, ConstructorsToAdd.Count > 1);
+            }
+
+            return ConstructorsToAdd.Count > 0;
         }
 
         private static bool WriteProperties(Type stubType, StringBuilder sb)
@@ -582,7 +614,7 @@ namespace PythonNetStubGenerator
             if (!string.IsNullOrEmpty(currentGenerics)) currentGenerics = $"[{currentGenerics}]";
             sb.Indent().AppendLine($"{methodName} : {className}{currentGenerics}");
 
-            using (WriteClassHeader(sb, className))
+            using (WriteClassHeader(sb, className, false))
             {
                 // We want to merge methods with the same amount of parameters with the same bounds
                 // (since the python type system can't distinguish between them)
@@ -692,6 +724,8 @@ namespace PythonNetStubGenerator
                 var paramName = it.ParameterType.ToPythonType();
                 if (paramName == "float") paramName = "int";
                 if (paramName == "bool") paramName = "int";
+                if (paramName.Contains("[float]")) paramName = paramName.Replace("[float]", "[int]");
+                if (paramName.Contains("[bool]")) paramName = paramName.Replace("[bool]", "[int]");
                 return paramName;
             });
             var signature = methodParams.CommaJoin();
@@ -739,7 +773,7 @@ namespace PythonNetStubGenerator
 
 
             sb.AppendLine();
-            using (WriteClassHeader(sb, methodClassName, aliasDictionary.Keys, genericAliases: aliasDictionary))
+            using (WriteClassHeader(sb, methodClassName, false, aliasDictionary.Keys, genericAliases: aliasDictionary))
             {
 
                 var callLines = GetMethodCallers(methodInfos, false);
@@ -752,13 +786,14 @@ namespace PythonNetStubGenerator
         }
 
 
-        private static void WriteSimpleMethod(StringBuilder sb, MethodBase method, bool isOverload = false)
+        private static bool WriteSimpleMethod(StringBuilder sb, MethodBase method, bool isOverload = false)
         {
             var isOperator = IsOperator(method);
             var isStatic = method.IsStatic && !isOperator;
 
 
             var methodName = method.IsConstructor ? "__init__" : method.Name;
+            if (methodName == "<Clone>$") return false;
             if (isOperator)
             {
                 methodName = ConvertOperatorName(method.Name);
@@ -766,7 +801,7 @@ namespace PythonNetStubGenerator
                 {
                     var signature = method.GetParameters().Select(it => it.Name + ": " + it.ParameterType.Name).CommaJoin();
                     sb.Indent().AppendLine($"# Operator not supported {method.Name}({signature})");
-                    return;
+                    return false;
                 }
             }
 
@@ -782,6 +817,7 @@ namespace PythonNetStubGenerator
             // ReSharper enable StringLiteralTypo - python decorator
 
             sb.Indent().AppendLine($"def {methodName}({parameters}) -> {returnType}: ...");
+            return true;
         }
 
         private static string ConvertOperatorName(string methodName)
@@ -835,21 +871,28 @@ namespace PythonNetStubGenerator
 
         private static void WriteEnum(StringBuilder sb, Type stubType)
         {
-            sb.Indent().AppendLine($"class {stubType.Name}:");
+            var underlyingType = stubType.GetEnumUnderlyingType().ToPythonType();
+            sb.Indent().AppendLine($"class {stubType.Name}(typing.SupportsInt):");
             using var _ = new IndentScope();
-
+            
+            sb.Indent().AppendLine("@typing.overload");
+            sb.Indent().AppendLine($"def __init__(self, value : {underlyingType}) -> None: ...");
+            sb.Indent().AppendLine("@typing.overload");
+            sb.Indent().AppendLine($"def __init__(self, value : {underlyingType}, force_if_true: {typeof(bool).ToPythonType()}) -> None: ...");
+            sb.Indent().AppendLine();
+            sb.Indent().AppendLine("# Values:");
             var names = Enum.GetNames(stubType);
             var values = Enum.GetValues(stubType);
 
             for (var i = 0; i < names.Length; i++)
             {
                 var name = names[i];
-                if (name.Equals("None", StringComparison.Ordinal))
-                    name = $"#{name}";
+                name = PythonTypes.SafePythonName(name);
 
                 var val = Convert.ChangeType(values.GetValue(i), Type.GetTypeCode(stubType));
-                sb.Indent().AppendLine($"{name} = {val}");
+                sb.Indent().AppendLine($"{name} : {stubType.ToPythonType()} # {val}");
             }
+
         }
     }
 }

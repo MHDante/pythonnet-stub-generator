@@ -12,6 +12,43 @@ namespace PythonNetStubGenerator
         private static readonly HashSet<string> DirtyNamespaces = new HashSet<string>();
         private static readonly HashSet<Type> CurrentTypes = new HashSet<Type>();
         private static readonly HashSet<string> CurrentNamespaces = new HashSet<string>();
+        private static readonly HashSet<Type> OverloadedNonGenericTypes = new HashSet<Type>();
+
+
+        public static void CacheOverloadedNonGenericTypes(IEnumerable<Type> stubTypes)
+        {
+            var namesInSpace = new Dictionary<string, Dictionary<string, List<Type>>>();
+            foreach (var type in stubTypes)
+            {
+                if (type.DeclaringType != null)
+                {
+                    if (type.IsGenericType) continue;
+                    foreach (var siblingType in type.DeclaringType.GetNestedTypes())
+                    {
+                        if (!siblingType.IsGenericType) continue;
+                        if (siblingType.NonGenericName() == type.Name)
+                        {
+                            OverloadedNonGenericTypes.Add(type);
+                        }
+                    }
+                    continue;
+                }
+
+                var baseName = type.NonGenericName();
+                var ns = type.Namespace ?? "";
+                var typesByName = namesInSpace.TryGetValue(ns, out var val) ? val : namesInSpace[ns] = new Dictionary<string, List<Type>>();
+                var typesWithName = typesByName.TryGetValue(baseName, out var val2) ? val2 : typesByName[baseName] = new List<Type>();
+
+                typesWithName.Add(type);
+                if (typesWithName.Count <= 1) continue;
+                foreach (var overloadedType in typesWithName)
+                {
+                    if (!overloadedType.IsGenericType) OverloadedNonGenericTypes.Add(overloadedType);
+                }
+            }
+        }
+
+        public static bool IsOverloadedNonGenericType(this Type type) => OverloadedNonGenericTypes.Contains(type);
 
 
         public static bool CurrentUsedGenericArray { get; private set; }
@@ -21,7 +58,7 @@ namespace PythonNetStubGenerator
         {
             var isNewAdd = AllExportedTypes.Add(t);
             if (isNewAdd) DirtyNamespaces.Add(t.Namespace);
-            if (t!= typeof(Nullable<>)) CurrentTypes.Add(t);
+            if (t != typeof(Nullable<>)) CurrentTypes.Add(t);
         }
 
         public static void AddArrayDependency(bool isGeneric)
@@ -57,8 +94,9 @@ namespace PythonNetStubGenerator
 
         internal static string SafePythonName(string s)
         {
-            if (s == "from")
-                return "from_";
+            if (s == "from") return "from_";
+            if (s == "del") return "del_";
+            if (s == "None") return "None_";
             return s;
         }
 
@@ -160,7 +198,7 @@ namespace PythonNetStubGenerator
             if (s != null) return $"{s}.";
 
             var cleanName = type.CleanName();
-            if (SymbolScope.Scopes.Any(it=>it.HasConflict(cleanName, type.Namespace)))
+            if (SymbolScope.Scopes.Any(it => it.HasConflict(cleanName, type.Namespace)))
             {
                 AddNamespaceDependency(type.Namespace);
                 return $"{type.Namespace}.";
@@ -175,7 +213,6 @@ namespace PythonNetStubGenerator
         {
             IEnumerable<Type> result = type.GetGenericArguments();
             if (type.IsGenericType) AddDependency(type.GetGenericTypeDefinition());
-            if (type.DeclaringType != null) result = GetGenerics(type.DeclaringType).Concat(result);
             return result.ToList();
         }
 

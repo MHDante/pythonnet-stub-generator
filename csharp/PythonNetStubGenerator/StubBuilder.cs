@@ -26,7 +26,7 @@ namespace PythonNetStubGenerator
                     foreach (var path in SearchPaths)
                         SearchPaths.Add(path);
 
-
+                Console.WriteLine($"Generating Assembly: {assemblyToStub.FullName}");
                 foreach (var exportedType in assemblyToStub.GetExportedTypes())
                 {
                     if(!exportedType.IsVisible) continue;
@@ -34,6 +34,23 @@ namespace PythonNetStubGenerator
                 }
             }
 
+
+            var typeAssembly = typeof(Type).Assembly;
+            Console.WriteLine($"Generating Built-in Assembly: {typeAssembly.FullName}");
+
+            foreach (var exportedType in typeAssembly.GetExportedTypes())
+            {
+                if(!exportedType.IsVisible) continue;
+                PythonTypes.AddDependency(exportedType);
+            }
+
+            var consoleAssembly = typeof(Console).Assembly;
+            Console.WriteLine($"Generating Built-in Assembly: {consoleAssembly.FullName}");
+            foreach (var exportedType in consoleAssembly.GetExportedTypes())
+            {
+                if(!exportedType.IsVisible) continue;
+                PythonTypes.AddDependency(exportedType);
+            }
 
 
             while (true)

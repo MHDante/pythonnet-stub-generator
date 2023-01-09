@@ -1,7 +1,4 @@
-﻿using System.Collections;
-using System.Reflection;
-
-using PythonNetStubGenerator;
+﻿using PythonNetStubGenerator;
 
 namespace PythonNetStubTool
 {
@@ -12,11 +9,12 @@ namespace PythonNetStubTool
         /// </summary>
         /// <param name="destPath">Path to save the subs to.</param>
         /// <param name="searchPaths">Path to search for referenced assemblies</param>
-        /// <param name="targetDlls">Target DLLs</param>
+        /// <param name="targetDlls">Target DLLsz</param>
         static int Main(
             DirectoryInfo destPath,
-            DirectoryInfo[]? searchPaths = null,
-            params FileInfo[] targetDlls)
+            string targetDlls,
+            DirectoryInfo[]? searchPaths = null
+            )
         {
             if (searchPaths != null)
             {
@@ -24,14 +22,16 @@ namespace PythonNetStubTool
                     Console.WriteLine($"search path {searchPath}");
             }
 
-            
-            foreach (var assemblyPath in targetDlls)
+            var infos = new List<FileInfo>();
+            foreach (var pathStr in targetDlls.Split(','))
             {
+                var assemblyPath = new FileInfo(pathStr);
                 if (!assemblyPath.Exists)
                 {
                     Console.WriteLine($"error: can not find {assemblyPath}");
                     return -1;
                 }
+                infos.Add(assemblyPath);
 
             }
             
@@ -39,7 +39,7 @@ namespace PythonNetStubTool
 
             try
             {
-                var dest = StubBuilder.BuildAssemblyStubs(destPath, targetDlls, searchPaths);
+                var dest = StubBuilder.BuildAssemblyStubs(destPath, infos.ToArray(), searchPaths);
                 Console.WriteLine($"stubs saved to {dest}");
                 return 0;
             }

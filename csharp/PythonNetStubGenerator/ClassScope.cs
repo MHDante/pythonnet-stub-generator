@@ -12,15 +12,18 @@ namespace PythonNetStubGenerator
         public static ClassScope Current => ClassScopes.LastOrDefault();
         public string PythonClass { get; }
         public Type[] Generics { get; }
+        public bool ShouldShadowGenerics { get; }
 
         private IndentScope IndentScope { get; set; }
 
-        public ClassScope(string pythonClass, IEnumerable<Type> newGenerics)
+        public ClassScope(string pythonClass, IEnumerable<Type> newGenerics, bool shouldShadowGenerics)
         {
             Generics = newGenerics.ToArray();
+            ShouldShadowGenerics = shouldShadowGenerics;
             PythonClass = pythonClass;
             ClassScopes.Add(this);
         }
+
 
         public void EnterIndent() => IndentScope ??= new IndentScope();
 
@@ -37,8 +40,15 @@ namespace PythonNetStubGenerator
             ClassScopes.Count == 0 ? "" :
                 string.Join(".", ClassScopes.Select(it => it.PythonClass)) + ".";
 
-        public static IEnumerable<Type> AccessibleGenerics =>
-            ClassScopes.SelectMany(it => it.Generics);
+        public static IEnumerable<Type> AccessibleGenerics
+        {
+            get
+            {
+                var start = ClassScopes.FindLastIndex(it => it.ShouldShadowGenerics);
+                if (start == -1) start = 0;
+                return ClassScopes.Skip(start).SelectMany(it => it.Generics);
+            }
+        }
     }
 
 }
