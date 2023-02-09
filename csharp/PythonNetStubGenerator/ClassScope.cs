@@ -13,6 +13,7 @@ namespace PythonNetStubGenerator
         public string PythonClass { get; }
         public Type[] Generics { get; }
         public bool ShouldShadowGenerics { get; }
+        public string OutsideAccessor { get; }
 
         private IndentScope IndentScope { get; set; }
 
@@ -21,8 +22,10 @@ namespace PythonNetStubGenerator
             Generics = newGenerics.ToArray();
             ShouldShadowGenerics = shouldShadowGenerics;
             PythonClass = pythonClass;
+            OutsideAccessor = ScopeAccessor;
             ClassScopes.Add(this);
         }
+
 
 
         public void EnterIndent() => IndentScope ??= new IndentScope();
