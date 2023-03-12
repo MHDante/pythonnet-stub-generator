@@ -903,6 +903,7 @@ namespace PythonNetStubGenerator
             sb.Indent().AppendLine($"def __init__(self, value : {underlyingType}) -> None: ...");
             sb.Indent().AppendLine("@typing.overload");
             sb.Indent().AppendLine($"def __init__(self, value : {underlyingType}, force_if_true: {typeof(bool).ToPythonType()}) -> None: ...");
+            sb.Indent().AppendLine($"def __int__(self) -> int: ...");
             sb.Indent().AppendLine();
             sb.Indent().AppendLine("# Values:");
             var names = Enum.GetNames(stubType);
