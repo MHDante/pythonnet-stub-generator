@@ -19,6 +19,7 @@ Things I would like to do:
 - Create a simple tool that can be installed with either pip or nuget
 - Add tests!
 - Write documentation on specific features and gotchas.
+- Use XML docs to generate docstrings for functions see [this thread](https://github.com/pythonnet/pythonnet/issues/374)
 
 This would be much easier if I had someone to bounce ideas off of or work alongside of.
 Not looking to dump all the work on you, just would like someone to discuss and bounce code off of.
