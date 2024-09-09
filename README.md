@@ -6,7 +6,7 @@ You can install this through nuget. It then lets you use it as a global tool
 
 ```
 dotnet tool install --global pythonnetstubgenerator.tool
-GeneratePythonNetStubs --dest-path="../py_project/typings" --target-dlls="dll_folder/MyLib1.dll;other_folder/MyLib2.dll"
+GeneratePythonNetStubs --dest-path="../py_project/typings" --target-dlls="dll_folder/MyLib1.dll,other_folder/MyLib2.dll"
 ```
 
 # HELP WANTED
