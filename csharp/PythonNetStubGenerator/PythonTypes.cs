@@ -97,6 +97,7 @@ namespace PythonNetStubGenerator
             if (s == "from") return "from_";
             if (s == "del") return "del_";
             if (s == "None") return "None_";
+            if (s == "def") return "def_";
             return s;
         }
 
@@ -153,6 +154,7 @@ namespace PythonNetStubGenerator
             if (t.IsArray)
             {
                 AddArrayDependency(true);
+                if (withGenericParams && t.GetElementType() == typeof(byte)) return "bytearray";
                 return !withGenericParams ? "Array_1" : $"Array_1[{t.GetElementType().ToPythonType()}]";
             }
 
