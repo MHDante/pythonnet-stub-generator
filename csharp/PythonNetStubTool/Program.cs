@@ -9,7 +9,7 @@ namespace PythonNetStubTool
         /// </summary>
         /// <param name="destPath">Path to save the subs to.</param>
         /// <param name="searchPaths">Path to search for referenced assemblies</param>
-        /// <param name="targetDlls">Target DLLsz</param>
+        /// <param name="targetDlls">Target DLLs</param>
         static int Main(
             DirectoryInfo destPath,
             string targetDlls,
