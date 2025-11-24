@@ -1,12 +1,13 @@
-﻿using System;
+﻿using Microsoft.Build.Framework;
+using Microsoft.Build.Utilities;
+using PythonNetStubGenerator;
+using System;
 using System.IO;
 using System.Linq;
-using Microsoft.Build.Framework;
-using Microsoft.Build.Utilities;
 
-namespace PythonNetStubGenerator
+namespace PythonNetStubTask
 {
-    public class PythonStubTask : Task
+    public class PythonNetStubTask : Task
     {
         [Required]
         public string DestPath { get; set; }
