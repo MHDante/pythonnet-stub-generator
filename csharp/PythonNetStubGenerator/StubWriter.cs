@@ -818,20 +818,28 @@ namespace PythonNetStubGenerator
 
             var methodName = method.IsConstructor ? "__init__" : method.Name;
             if (methodName == "<Clone>$") return false;
+            int skipIndex = -1;
             if (isOperator)
             {
-                methodName = ConvertOperatorName(method.Name);
+                var methodParams = method.GetParameters();
+                var isReverse = methodParams.Length == 2
+                    && methodParams[0].ParameterType != method.DeclaringType
+                    && methodParams[1].ParameterType == method.DeclaringType;
+
+                methodName = ConvertOperatorName(method.Name, isReverse);
                 if (methodName == null)
                 {
                     var signature = method.GetParameters().Select(it => it.Name + ": " + it.ParameterType.Name).CommaJoin();
                     sb.Indent().AppendLine($"# Operator not supported {method.Name}({signature})");
                     return false;
                 }
+
+                skipIndex = isReverse ? 1 : 0;
             }
 
             var returnType = method is MethodInfo mi ? mi.ReturnType.ToPythonType() : "None";
 
-            var parameters = GetParameters(method, !isStatic);
+            var parameters = GetParameters(method, !isStatic, skipIndex: skipIndex);
 
 
             // ReSharper disable StringLiteralTypo - python decorator
@@ -844,7 +852,7 @@ namespace PythonNetStubGenerator
             return true;
         }
 
-        private static string ConvertOperatorName(string methodName)
+        private static string ConvertOperatorName(string methodName, bool isReverse = false)
         {
             switch (methodName)
             {
@@ -854,16 +862,16 @@ namespace PythonNetStubGenerator
                 case "op_LessThan": return "__lt__";
                 case "op_GreaterThanOrEqual": return "__ge__";
                 case "op_LessThanOrEqual": return "__le__";
-                case "op_BitwiseAnd": return "__and__";
-                case "op_BitwiseOr": return "__or__";
-                case "op_Addition": return "__add__";
-                case "op_Subtraction": return "__sub__";
-                case "op_Division": return "__truediv__";
-                case "op_Modulus": return "__mod__";
-                case "op_Multiply": return "__mul__";
-                case "op_LeftShift": return "__lshift__";
-                case "op_RightShift": return "__rshift__";
-                case "op_ExclusiveOr": return "__xor__";
+                case "op_BitwiseAnd": return isReverse ? "__rand__" : "__and__";
+                case "op_BitwiseOr": return isReverse ? "__ror__" : "__or__";
+                case "op_Addition": return isReverse ? "__radd__" : "__add__";
+                case "op_Subtraction": return isReverse ? "__rsub__" : "__sub__";
+                case "op_Division": return isReverse ? "__rtruediv__" : "__truediv__";
+                case "op_Modulus": return isReverse ? "__rmod__" : "__mod__";
+                case "op_Multiply": return isReverse ? "__rmul__" : "__mul__";
+                case "op_LeftShift": return isReverse ? "__rlshift__" : "__lshift__";
+                case "op_RightShift": return isReverse ? "__rrshift__" : "__rshift__";
+                case "op_ExclusiveOr": return isReverse ? "__rxor__" : "__xor__";
                 case "op_UnaryNegation": return "__neg__";
                 case "op_UnaryPlus": return "__pos__";
                 case "op_OnesComplement": return "__invert__";
@@ -877,7 +885,7 @@ namespace PythonNetStubGenerator
             return null;
         }
 
-        private static string GetParameters(MethodBase method, bool includeSelf)
+        private static string GetParameters(MethodBase method, bool includeSelf, int skipIndex = -1)
         {
             string GetParameter(ParameterInfo it)
             {
@@ -888,6 +896,9 @@ namespace PythonNetStubGenerator
             }
 
             var parameters = method.GetParameters();
+            if (skipIndex >= 0)
+                parameters = parameters.Where((_, i) => i != skipIndex).ToArray();
+
             var pythonParams = parameters.Select(GetParameter);
             if (includeSelf) pythonParams = pythonParams.Prepend("self");
             return pythonParams.CommaJoin();
